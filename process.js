@@ -57,7 +57,7 @@ const input = require("./input/input.json");
 
 //loop through and amend
 
-const zipper = {}
+const zipper = {};
 
 for (email in emails) {
   let temp = emails[email];
@@ -90,25 +90,26 @@ for (email in emails) {
   }
 
   //zip
+  if (false) {
+    zipper[`${email}`] = new JSZip();
 
-  zipper[`${email}`] = new JSZip();
+    zipper[`${email}`].file("template.html", temp);
 
-  zipper[`${email}`].file("template.html", temp);
+    const images = fs.readdirSync(`./source/${email}/images`);
 
-  const images = fs.readdirSync(`./source/${email}/images`);
+    images.forEach((image) => {
+      const filePath = path.join(`./source/${email}/images`, image);
+      const content = fs.readFileSync(filePath);
+      zipper[`${email}`].file(`images/${image}`, content);
+    });
 
-  images.forEach((image) => {
-    const filePath = path.join(`./source/${email}/images`, image);
-    const content = fs.readFileSync(filePath);
-    zipper[`${email}`].file(`images/${image}`, content);
-  });
-
-  zipper[`${email}`]
-  .generateAsync({ type: "nodebuffer" })
-  .then((content) => {
-    fs.writeFileSync(`./${email}.zip`, content);
-  })
-  .catch((err) => {
-    console.error("Error creating zip file:", err);
-  });
+    zipper[`${email}`]
+      .generateAsync({ type: "nodebuffer" })
+      .then((content) => {
+        fs.writeFileSync(`./${email}.zip`, content);
+      })
+      .catch((err) => {
+        console.error("Error creating zip file:", err);
+      });
+  }
 }
