@@ -1,12 +1,9 @@
-//tools
-
 const fs = require("fs");
-//const cheerio = require("cheerio");
 const request = require("request");
 const JSZip = require("jszip");
 const path = require("path");
 
-//get emails
+// Get emails
 const abandoned = fs.readFileSync("./source/abandoned/template.html", "utf-8");
 const anniversary = fs.readFileSync(
   "./source/anniversary/template.html",
@@ -51,65 +48,71 @@ const emails = {
   webinar2,
 };
 
-//get input json
-
+// Get input JSON
 const input = require("./input/input.json");
 
-//loop through and amend
-
-const zipper = {};
-
-for (email in emails) {
-  let temp = emails[email];
-
-  temp = temp.replaceAll(/#c9fff7/gi, input.background);
-  temp = temp.replaceAll(/#393030/gi, input.lowlight);
-  temp = temp.replaceAll(/#07be00/gi, input.highlight);
-
-  const download = function (uri, filename, callback) {
-    request.head(uri, function (err, res, body) {
-      console.log("content-type:", res.headers["content-type"]);
-      console.log("content-length:", res.headers["content-length"]);
-
-      request(uri).pipe(fs.createWriteStream(filename)).on("close", callback);
+const download = function (uri, filename) {
+  return new Promise((resolve, reject) => {
+    request.head(uri, function (err, res) {
+      if (err) return reject(err);
+      request(uri)
+        .pipe(fs.createWriteStream(filename))
+        .on("close", resolve)
+        .on("error", reject);
     });
-  };
+  });
+};
 
-  download(input.logoUrl, `./source/${email}/images/logo.jpg`, () => {});
+// Process each email sequentially
+const processEmails = async () => {
+  for (const email in emails) {
+    try {
+      let temp = emails[email];
+      temp = temp.replaceAll(/#c9fff7/gi, input.background);
+      temp = temp.replaceAll(/#393030/gi, input.lowlight);
+      temp = temp.replaceAll(/#07be00/gi, input.highlight);
 
-  switch (email) {
-    case "nurture2":
-      temp = temp.replace("images/1712578675-4c24b22a.png", "images/logo.jpg");
-      break;
-    case "nurture1":
-      temp = temp.replace("images/1712576772-30444fb9.png", "images/logo.jpg");
-      break;
-    default:
-      temp = temp.replace("images/1712575426-3693fdeb.png", "images/logo.jpg");
-      break;
-  }
+      await download(input.logoUrl, `./source/${email}/images/logo.jpg`);
 
-  //zip
-  if (false) {
-    zipper[`${email}`] = new JSZip();
+      switch (email) {
+        case "nurture2":
+          temp = temp.replace(
+            "images/1712578675-4c24b22a.png",
+            "images/logo.jpg"
+          );
+          break;
+        case "nurture1":
+          temp = temp.replace(
+            "images/1712576772-30444fb9.png",
+            "images/logo.jpg"
+          );
+          break;
+        default:
+          temp = temp.replace(
+            "images/1712575426-3693fdeb.png",
+            "images/logo.jpg"
+          );
+          break;
+      }
 
-    zipper[`${email}`].file("template.html", temp);
+      const zip = new JSZip();
+      zip.file("template.html", temp);
 
-    const images = fs.readdirSync(`./source/${email}/images`);
-
-    images.forEach((image) => {
-      const filePath = path.join(`./source/${email}/images`, image);
-      const content = fs.readFileSync(filePath);
-      zipper[`${email}`].file(`images/${image}`, content);
-    });
-
-    zipper[`${email}`]
-      .generateAsync({ type: "nodebuffer" })
-      .then((content) => {
-        fs.writeFileSync(`./${email}.zip`, content);
-      })
-      .catch((err) => {
-        console.error("Error creating zip file:", err);
+      const images = fs.readdirSync(`./source/${email}/images`);
+      images.forEach((image) => {
+        const filePath = path.join(`./source/${email}/images`, image);
+        const content = fs.readFileSync(filePath);
+        zip.file(`images/${image}`, content);
       });
+
+      const zipContent = await zip.generateAsync({ type: "nodebuffer" });
+      fs.writeFileSync(`./${email}.zip`, zipContent);
+
+      console.log(`Created ${email}.zip successfully.`);
+    } catch (err) {
+      console.error(`Error processing ${email}:`, err);
+    }
   }
-}
+};
+
+processEmails();
